@@ -12,3 +12,6 @@ Hydra is designed to reduce silent training failures, version mismatches, and hi
 - No silent system modifications
 - Reproducible structured reports
 - Infrastructure-grade transparency
+
+![Status](https://img.shields.io/badge/status-early--development-orange)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
