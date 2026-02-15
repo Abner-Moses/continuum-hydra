@@ -39,7 +39,17 @@ def is_container() -> bool:
     except OSError:
         return False
 
-    return any(token in cgroup for token in ('docker', 'containerd'))
+    return any(
+        token in cgroup
+        for token in (
+            'docker',
+            'containerd',
+            'kubepods',
+            'podman',
+            'libpod',
+            'crio',
+        )
+    )
 
 
 def get_os_string() -> str:

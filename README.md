@@ -41,5 +41,13 @@ which continuum
 continuum --help
 continuum doctor
 ```
+
+### Run Doctor Tests (no external test runner required)
+
+If you cannot install `pytest` (for example in an offline environment), run:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
 ![Status](https://img.shields.io/badge/status-early--development-orange)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
