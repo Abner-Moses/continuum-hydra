@@ -201,7 +201,8 @@ class CudaDriverVersionCheck(BaseCheck):
             },
             remediation=[
                 "Install or repair NVIDIA drivers.",
-                "Verify nvidia-smi works and NVML is available.",
+                "Run nvidia-smi to verify driver visibility.",
+                "Verify NVML access with: python -c \"import pynvml; pynvml.nvmlInit(); print('ok')\"",
             ],
             severity=3 if smi_present else 1,
         )
@@ -390,6 +391,7 @@ class CudaDriverCompatCheck(BaseCheck):
                 details=details,
                 remediation=[
                     "Verify NVIDIA's CUDA compatibility matrix for this CUDA release.",
+                    "Reference: https://docs.nvidia.com/deploy/cuda-compatibility/",
                 ],
                 severity=1,
             )

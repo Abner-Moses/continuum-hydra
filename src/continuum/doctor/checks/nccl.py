@@ -68,6 +68,7 @@ class NcclEnvConfigCheck(BaseCheck):
                 message="Potentially problematic NCCL environment settings detected.",
                 details=details,
                 remediation=[
+                    "Unset overrides and retry: unset NCCL_P2P_DISABLE NCCL_IB_DISABLE NCCL_SOCKET_IFNAME",
                     "Unset restrictive NCCL_* variables unless intentionally required.",
                     "Prefer explicit interface selection for production networks.",
                 ],

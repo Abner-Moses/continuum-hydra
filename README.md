@@ -102,5 +102,24 @@ Offline-friendly unittest command:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py" -v
 ```
+
+Fresh-user smoke install/run:
+
+```bash
+./scripts/smoke_install_and_run.sh
+```
+
+Manual copy/paste smoke flow:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e .
+continuum doctor --list-checks
+continuum doctor --deterministic --json --no-write
+continuum doctor
+ls -1 .hydra/reports/doctor_*.json | tail -n 1
+```
 ![Status](https://img.shields.io/badge/status-hydra--doctor--development-orange)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)

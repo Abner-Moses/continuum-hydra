@@ -80,6 +80,7 @@ class GpuDevicePropertiesCheck(BaseCheck):
                 details=details,
                 remediation=[
                     "Mixed precision and tensor-core acceleration may be limited on older GPUs.",
+                    "Verify capabilities with: python -c \"import torch; print([torch.cuda.get_device_capability(i) for i in range(torch.cuda.device_count())])\"",
                 ],
                 severity=1,
             )
