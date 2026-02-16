@@ -60,6 +60,22 @@ class SkippedCheck(BaseCheck):
         raise AssertionError("should not run")
 
 
+class TimedCheck(BaseCheck):
+    id = "timed.pass"
+    title = "Timed"
+    category = "timed"
+
+    def run(self, context):
+        return CheckResult(
+            id=self.id,
+            title=self.title,
+            category=self.category,
+            status=Status.PASS,
+            message="timed",
+            duration_ms=5.0,
+        )
+
+
 class TestDoctorRunner(unittest.TestCase):
     def test_run_handles_pass_warn_skip_error(self) -> None:
         runner = DoctorRunner(
@@ -81,6 +97,20 @@ class TestDoctorRunner(unittest.TestCase):
         self.assertEqual(DoctorRunner.exit_code(_report_with_status("warnings")), 1)
         self.assertEqual(DoctorRunner.exit_code(_report_with_status("failed")), 2)
         self.assertEqual(DoctorRunner.exit_code(_report_with_status("error")), 2)
+
+    def test_filter_checks_by_category_and_id_and_exclude(self) -> None:
+        checks = DoctorRunner(hydra_version="0.1.0", checks=[PassingCheck, WarningCheck, TimedCheck]).checks
+        filtered = DoctorRunner.filter_checks(checks, only={"test", "timed.pass"}, exclude={"test.warn"})
+        ids = [check.id for check in filtered]
+        self.assertEqual(ids, ["test.pass", "timed.pass"])
+
+    def test_deterministic_mode_stabilizes_timestamp_and_durations(self) -> None:
+        runner = DoctorRunner(hydra_version="0.1.0", checks=[TimedCheck])
+        report = runner.run(context={"deterministic": True})
+
+        self.assertEqual(report.environment.timestamp_utc, "1970-01-01T00:00:00Z")
+        self.assertEqual(report.checks[0].duration_ms, 0.0)
+        self.assertEqual(report.total_duration_ms, 0.0)
 
 
 def _report_with_status(overall_status):
