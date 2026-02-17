@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typer
 
+from continuum.accelerate.cli import app as accelerate_app
 from continuum.doctor.main import doctor_command
 from continuum.profiler.main import profile_command
 from continuum.setup.main import setup_command
@@ -11,13 +12,13 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-
 @app.callback()
 def main() -> None:
     """Root CLI group for Continuum subcommands."""
 
 
 app.command(name="doctor")(doctor_command)
+app.add_typer(accelerate_app, name="accelerate")
 app.command(name="profile")(profile_command)
 app.command(name="setup")(setup_command)
 
