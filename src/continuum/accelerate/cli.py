@@ -336,6 +336,7 @@ def launch_command(
     no_timestamp: bool = typer.Option(False, "--no-timestamp", help="Disable timestamps for deterministic planner JSON outputs."),
     max_restarts: int = typer.Option(1, "--max-restarts", min=0, help="Maximum auto-resume restarts in script mode."),
     auto_resume: bool = typer.Option(True, "--auto-resume/--no-auto-resume", help="Attempt automatic resume from latest checkpoint in script mode."),
+    debug: bool = typer.Option(False, "--debug", help="Print debug argv tracing for script mode."),
 ) -> None:
     console = Console(stderr=True)
     quiet_human = quiet or json_output
@@ -360,6 +361,7 @@ def launch_command(
                 out=out,
                 no_state_write=no_state_write,
                 dry_run=runtime_dry_run,
+                debug=debug,
             )
             raise typer.Exit(code=exit_code)
 

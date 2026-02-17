@@ -25,7 +25,9 @@ def _build_run_id() -> str:
 
 
 def _scan_checkpoints(cwd: Path) -> Path | None:
-    roots = [cwd, cwd / "checkpoints", cwd / "outputs", cwd / "runs"]
+    # Restrict checkpoint discovery to training artifact directories.
+    # This avoids false matches from environment files like *.pth in .venv.
+    roots = [cwd / "checkpoints", cwd / "outputs", cwd / "runs"]
     candidates: list[Path] = []
 
     for root in roots:
@@ -63,6 +65,34 @@ def _stderr_print(message: str, quiet: bool) -> None:
         print(message, file=sys.stderr)
 
 
+def _terminate_process(process: subprocess.Popen[str], quiet: bool) -> None:
+    if process.poll() is not None:
+        return
+    _stderr_print("[launch] interrupt received; sending SIGINT to child", quiet)
+    try:
+        process.send_signal(signal.SIGINT)
+        process.wait(timeout=5)
+        return
+    except Exception:  # noqa: BLE001
+        pass
+    if process.poll() is not None:
+        return
+
+    _stderr_print("[launch] child still running; sending SIGTERM", quiet)
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+        return
+    except Exception:  # noqa: BLE001
+        pass
+    if process.poll() is not None:
+        return
+
+    _stderr_print("[launch] child still running; sending SIGKILL", quiet)
+    process.kill()
+    process.wait(timeout=5)
+
+
 def _run_once(
     script: Path,
     script_args: list[str],
@@ -72,8 +102,9 @@ def _run_once(
     verbose: bool,
     known_checkpoint: Path | None,
 ) -> tuple[int, dict[str, Any], Path | None]:
-    command = [sys.executable, str(script), *script_args]
+    command = [sys.executable, "-u", str(script), *script_args]
     env = dict(os.environ)
+    env["PYTHONUNBUFFERED"] = "1"
     if known_checkpoint is not None:
         env["CONTINUUM_LAUNCH_RESUME_CHECKPOINT"] = str(known_checkpoint)
 
@@ -91,6 +122,7 @@ def _run_once(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        universal_newlines=True,
         bufsize=1,
         env=env,
     )
@@ -116,12 +148,7 @@ def _run_once(
 
             return_code = process.wait()
     except KeyboardInterrupt:
-        try:
-            process.send_signal(signal.SIGINT)
-            process.wait(timeout=5)
-        except Exception:  # noqa: BLE001
-            process.kill()
-            process.wait(timeout=5)
+        _terminate_process(process, quiet=quiet)
         raise
 
     ended = _utc_now()
@@ -131,7 +158,7 @@ def _run_once(
         "started_at": started,
         "ended_at": ended,
         "duration_seconds": duration,
-        "command": command,
+        "command_argv": command,
         "return_code": return_code,
         "checkpoint_seen": str(checkpoint_seen) if checkpoint_seen else None,
         "stdout_tail": list(recent_lines)[-40:],
@@ -152,11 +179,17 @@ def launch_training_script(
     out: Path | None,
     no_state_write: bool,
     dry_run: bool,
+    debug: bool = False,
 ) -> tuple[int, dict[str, Any]]:
     run_id = _build_run_id()
     run_dir = cwd / ".hydra" / "launch" / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "launch.log"
+
+    base_command_argv = [sys.executable, "-u", str(script), *script_args]
+    if debug:
+        _stderr_print(f"[launch][debug] command_argv={base_command_argv!r}", quiet=False)
+        _stderr_print(f"[launch][debug] script_args={script_args!r}", quiet=False)
 
     if dry_run:
         report = {
@@ -165,6 +198,7 @@ def launch_training_script(
             "mode": "dry-run",
             "script": str(script),
             "script_args": list(script_args),
+            "command_argv": list(base_command_argv),
             "status": "dry-run",
             "attempts": [],
             "restarts_used": 0,
@@ -172,6 +206,7 @@ def launch_training_script(
             "latest_checkpoint": str(_scan_checkpoints(cwd)) if _scan_checkpoints(cwd) else None,
             "log_path": str(log_path),
             "error": None,
+            "exit_code": 0,
         }
         if not no_state_write:
             write_json(cwd / ".hydra" / "state" / "launch_latest.json", report)
@@ -237,6 +272,7 @@ def launch_training_script(
         "mode": "apply",
         "script": str(script),
         "script_args": list(script_args),
+        "command_argv": list(base_command_argv),
         "status": status,
         "attempts": attempts,
         "restarts_used": restarts_used,
@@ -244,6 +280,7 @@ def launch_training_script(
         "latest_checkpoint": str(latest_checkpoint) if latest_checkpoint else None,
         "log_path": str(log_path),
         "error": error,
+        "exit_code": exit_code,
     }
 
     write_json(run_dir / "report.json", report)

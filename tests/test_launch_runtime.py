@@ -72,6 +72,35 @@ sys.exit(1)
             finally:
                 os.chdir(previous)
 
+    def test_launch_preserves_exact_output_dir_arg(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            previous = Path.cwd()
+            try:
+                os.chdir(tmp)
+                script = Path("train.py")
+                script.write_text("print('ok')\n", encoding="utf-8")
+
+                result = runner.invoke(
+                    app,
+                    [
+                        "launch",
+                        "train.py",
+                        "--dry-run",
+                        "--json",
+                        "--",
+                        "--output-dir",
+                        "./outputs/mmfine_100m",
+                    ],
+                    catch_exceptions=False,
+                )
+                self.assertEqual(result.exit_code, 0)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["script_args"], ["--output-dir", "./outputs/mmfine_100m"])
+                self.assertIn("./outputs/mmfine_100m", payload["command_argv"])
+            finally:
+                os.chdir(previous)
+
 
 if __name__ == "__main__":
     unittest.main()
