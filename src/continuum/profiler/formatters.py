@@ -50,6 +50,7 @@ def render_profile_human(report: dict[str, Any], console: Console | None = None)
         for row in rows:
             table.add_row(_style_status(row["status"]), row["item"], row["result"], row["benchmark"])
         active_console.print(table)
+    _render_gpu_sustained_rich(report, active_console)
 
     static = report.get("static_profile", {}) if isinstance(report, dict) else {}
     notes = static.get("notes") if isinstance(static, dict) else None
@@ -66,6 +67,7 @@ def _render_profile_compact(report: dict[str, Any]) -> None:
         print("STATUS ITEM RESULT BENCHMARK")
         for row in rows:
             print(f"[{row['status']}] {row['item']} | {row['result']} | {row['benchmark']}")
+    _render_gpu_sustained_compact(report)
 
     static = report.get("static_profile", {}) if isinstance(report, dict) else {}
     notes = static.get("notes") if isinstance(static, dict) else None
@@ -197,6 +199,25 @@ def _build_status_rows(report: dict[str, Any]) -> list[dict[str, str]]:
                 }
             )
 
+    gpu_sustained = benchmarks.get("gpu_sustained") if isinstance(benchmarks, dict) else None
+    if isinstance(gpu_sustained, dict):
+        gpu_fields = [
+            ("benchmarks.gpu_sustained.mean_iter_per_sec", gpu_sustained.get("mean_iter_per_sec")),
+            ("benchmarks.gpu_sustained.p95_iter_per_sec", gpu_sustained.get("p95_iter_per_sec")),
+            ("benchmarks.gpu_sustained.std_iter_per_sec", gpu_sustained.get("std_iter_per_sec")),
+            ("benchmarks.gpu_sustained.backend", gpu_sustained.get("backend")),
+            ("benchmarks.gpu_sustained.dtype", gpu_sustained.get("dtype")),
+        ]
+        for item, value in gpu_fields:
+            rows.append(
+                {
+                    "status": _status_for_value(value),
+                    "item": item,
+                    "result": "null" if value is None else str(value),
+                    "benchmark": "gpu_sustained",
+                }
+            )
+
     return rows
 
 
@@ -256,6 +277,39 @@ def _render_memory_bandwidth_compact(report: dict[str, Any]) -> None:
     print(f"std_gbps: {'null' if mem.get('std_gbps') is None else mem.get('std_gbps')}")
     print(f"bytes_per_iter: {'null' if mem.get('bytes_per_iter') is None else mem.get('bytes_per_iter')}")
     print(f"duration_sec: {'null' if mem.get('duration_sec') is None else mem.get('duration_sec')}")
+
+
+def _render_gpu_sustained_rich(report: dict[str, Any], console: Console) -> None:
+    benchmarks = report.get("benchmarks") if isinstance(report, dict) else None
+    gpu = benchmarks.get("gpu_sustained") if isinstance(benchmarks, dict) else None
+    if not isinstance(gpu, dict):
+        return
+
+    section = Table(title="GPU Sustained")
+    section.add_column("Metric", overflow="fold")
+    section.add_column("Value", overflow="fold")
+    section.add_row("backend", "null" if gpu.get("backend") is None else str(gpu.get("backend")))
+    section.add_row("device", "null" if gpu.get("device") is None else str(gpu.get("device")))
+    section.add_row("dtype", "null" if gpu.get("dtype") is None else str(gpu.get("dtype")))
+    section.add_row("mean_iter_per_sec", "null" if gpu.get("mean_iter_per_sec") is None else str(gpu.get("mean_iter_per_sec")))
+    section.add_row("p95_iter_per_sec", "null" if gpu.get("p95_iter_per_sec") is None else str(gpu.get("p95_iter_per_sec")))
+    section.add_row("std_iter_per_sec", "null" if gpu.get("std_iter_per_sec") is None else str(gpu.get("std_iter_per_sec")))
+    console.print(section)
+
+
+def _render_gpu_sustained_compact(report: dict[str, Any]) -> None:
+    benchmarks = report.get("benchmarks") if isinstance(report, dict) else None
+    gpu = benchmarks.get("gpu_sustained") if isinstance(benchmarks, dict) else None
+    if not isinstance(gpu, dict):
+        return
+
+    print("GPU Sustained:")
+    print(f"backend: {'null' if gpu.get('backend') is None else gpu.get('backend')}")
+    print(f"device: {'null' if gpu.get('device') is None else gpu.get('device')}")
+    print(f"dtype: {'null' if gpu.get('dtype') is None else gpu.get('dtype')}")
+    print(f"mean_iter_per_sec: {'null' if gpu.get('mean_iter_per_sec') is None else gpu.get('mean_iter_per_sec')}")
+    print(f"p95_iter_per_sec: {'null' if gpu.get('p95_iter_per_sec') is None else gpu.get('p95_iter_per_sec')}")
+    print(f"std_iter_per_sec: {'null' if gpu.get('std_iter_per_sec') is None else gpu.get('std_iter_per_sec')}")
 
 
 __all__ = [

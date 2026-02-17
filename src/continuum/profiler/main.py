@@ -25,6 +25,7 @@ except Exception:  # pragma: no cover
 
 from continuum.profiler.formatters import build_profile_report, render_profile_human, write_profile_json
 from continuum.profiler.cpu_benchmark import run_cpu_benchmark
+from continuum.profiler.gpu_benchmark import run_gpu_benchmark
 from continuum.profiler.memory_bandwidth import run_memory_bandwidth
 from continuum.profiler.static_profile import collect_static_profile
 
@@ -32,8 +33,9 @@ AVAILABLE_BENCHMARKS = {
     "static": collect_static_profile,
     "cpu": run_cpu_benchmark,
     "memory": run_memory_bandwidth,
+    "gpu": run_gpu_benchmark,
 }
-_BENCHMARK_ORDER = ("static", "cpu", "memory")
+_BENCHMARK_ORDER = ("static", "cpu", "memory", "gpu")
 _OUTPUT_FORMATS = {"human", "json", "both"}
 
 
@@ -41,7 +43,7 @@ def profile_command(
     benchmarks: str | None = typer.Option(
         None,
         "--benchmarks",
-        help="Comma-separated benchmark keys to run: static,cpu,memory",
+        help="Comma-separated benchmark keys to run: static,cpu,memory,gpu",
     ),
     static_only: bool = typer.Option(
         False,
@@ -60,6 +62,11 @@ def profile_command(
     mem_duration: float = typer.Option(8.0, "--mem-duration", help="Memory benchmark measurement duration in seconds."),
     mem_warmup: float = typer.Option(2.0, "--mem-warmup", help="Memory benchmark warmup duration in seconds."),
     mem_mb: int | None = typer.Option(None, "--mem-mb", help="Memory benchmark buffer size in MB."),
+    gpu_duration: float = typer.Option(8.0, "--gpu-duration", help="GPU benchmark measurement duration in seconds."),
+    gpu_warmup: float = typer.Option(2.0, "--gpu-warmup", help="GPU benchmark warmup duration in seconds."),
+    gpu_size: int | None = typer.Option(None, "--gpu-size", help="GPU benchmark matrix dimension override."),
+    gpu_dtype: str = typer.Option("auto", "--gpu-dtype", help="GPU benchmark dtype: float16, bfloat16, float32, auto."),
+    no_gpu: bool = typer.Option(False, "--no-gpu", help="Skip GPU sustained benchmark."),
     verbose: bool = typer.Option(False, "--verbose", help="Print traceback on unexpected profiler errors."),
 ) -> None:
     try:
@@ -76,6 +83,11 @@ def profile_command(
             "mem_duration": mem_duration,
             "mem_warmup": mem_warmup,
             "mem_mb": mem_mb,
+            "gpu_duration": gpu_duration,
+            "gpu_warmup": gpu_warmup,
+            "gpu_size": gpu_size,
+            "gpu_dtype": gpu_dtype,
+            "no_gpu": no_gpu,
         }
         static_profile: dict[str, Any] = {}
         benchmarks_payload: dict[str, Any] = {}

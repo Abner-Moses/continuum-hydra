@@ -48,7 +48,8 @@ class TestProfileMain(unittest.TestCase):
         mock_static = unittest.mock.Mock(return_value={"cpu": {"model": "X"}})
         mock_cpu = unittest.mock.Mock(return_value={"cpu_sustained": {"iterations": 1}})
         mock_mem = unittest.mock.Mock(return_value={"memory_bandwidth": {"iterations": 1}})
-        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem}
+        mock_gpu = unittest.mock.Mock(return_value={"gpu_sustained": {"iterations": 1}})
+        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem, "gpu": mock_gpu}
         with patch("continuum.profiler.main.AVAILABLE_BENCHMARKS", registry):
             with patch("continuum.profiler.main.render_profile_human"):
                 with patch("continuum.profiler.main.typer.echo"):
@@ -84,7 +85,8 @@ class TestProfileMain(unittest.TestCase):
         mock_static = unittest.mock.Mock(return_value={"cpu": {"model": "X"}})
         mock_cpu = unittest.mock.Mock(return_value={"cpu_sustained": {"iterations": 1}})
         mock_mem = unittest.mock.Mock(return_value={"memory_bandwidth": {"iterations": 1}})
-        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem}
+        mock_gpu = unittest.mock.Mock(return_value={"gpu_sustained": {"iterations": 1}})
+        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem, "gpu": mock_gpu}
         with patch("continuum.profiler.main.AVAILABLE_BENCHMARKS", registry):
             with patch("continuum.profiler.main.render_profile_human") as mock_render:
                 with patch("continuum.profiler.main.typer.echo"):
@@ -100,7 +102,8 @@ class TestProfileMain(unittest.TestCase):
         mock_static = unittest.mock.Mock(return_value={"cpu": {"model": "X"}})
         mock_cpu = unittest.mock.Mock(return_value={"cpu_sustained": {"iterations": 1}})
         mock_mem = unittest.mock.Mock(return_value={"memory_bandwidth": {"iterations": 1}})
-        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem}
+        mock_gpu = unittest.mock.Mock(return_value={"gpu_sustained": {"iterations": 1}})
+        registry = {"static": mock_static, "cpu": mock_cpu, "memory": mock_mem, "gpu": mock_gpu}
         with patch("continuum.profiler.main.AVAILABLE_BENCHMARKS", registry):
             with patch("continuum.profiler.main.render_profile_human") as mock_render:
                 with patch("continuum.profiler.main.typer.echo"):
@@ -112,6 +115,7 @@ class TestProfileMain(unittest.TestCase):
         mock_static.assert_called_once()
         mock_cpu.assert_called_once()
         mock_mem.assert_called_once()
+        mock_gpu.assert_called_once()
         mock_render.assert_called_once()
 
 
