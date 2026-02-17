@@ -18,7 +18,7 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 def write_state_report(report: dict[str, Any], out: Path | None = None, cwd: Path | None = None) -> Path:
     base = cwd if cwd is not None else Path.cwd()
     state_dir = base / ".hydra" / "state"
-    latest_path = state_dir / "accelerate_latest.json"
+    latest_path = state_dir / "launch_latest.json"
     write_json(latest_path, report)
     if out is not None:
         write_json(out, report)
@@ -69,7 +69,7 @@ def render_summary(report: dict[str, Any], console: Console | None = None) -> No
     active_console = console or Console()
     summary = report.get("summary", {})
     active_console.print(
-        "Accelerate Summary: "
+        "Launch Summary: "
         f"Applied={summary.get('applied', 0)} "
         f"Skipped={summary.get('skipped', 0)} "
         f"Unsupported={summary.get('unsupported', 0)}"

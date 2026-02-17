@@ -18,7 +18,7 @@ def main() -> None:
 
 
 app.command(name="doctor")(doctor_command)
-app.add_typer(accelerate_app, name="accelerate")
+app.add_typer(accelerate_app, name="launch")
 app.command(name="profile")(profile_command)
 app.command(name="setup")(setup_command)
 

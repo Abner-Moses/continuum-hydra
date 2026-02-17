@@ -27,7 +27,7 @@ class PluginLoadResult:
 
 
 def _load_module(file_path: Path) -> Any:
-    module_name = f"continuum_accelerate_plugin_{file_path.stem}_{abs(hash(str(file_path))) & 0xFFFF}"
+    module_name = f"continuum_launch_plugin_{file_path.stem}_{abs(hash(str(file_path))) & 0xFFFF}"
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot create module spec for {file_path}")
@@ -39,7 +39,7 @@ def _load_module(file_path: Path) -> Any:
 
 def load_plugins(register_action: Callable[[Any], None], cwd: Path | None = None) -> PluginLoadResult:
     base = cwd if cwd is not None else Path.cwd()
-    plugin_dir = base / ".hydra" / "accelerate.d"
+    plugin_dir = base / ".hydra" / "launch.d"
     hooks = HookBundle()
     warnings: list[str] = []
     loaded_files: list[str] = []

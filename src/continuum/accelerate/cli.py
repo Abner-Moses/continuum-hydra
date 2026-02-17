@@ -17,7 +17,7 @@ from continuum.accelerate.ui.interactive import select_actions_interactively
 Profile = Literal["minimal", "balanced", "max", "expert"]
 
 app = typer.Typer(
-    help="Hydra Accelerate: safe performance optimization planner/executor",
+    help="Hydra Launch: safe performance optimization planner/executor",
     invoke_without_command=True,
 )
 
@@ -31,7 +31,7 @@ def _eprint(message: str) -> None:
 
 
 def _render_plan(plan_dict: dict, console: Console) -> None:
-    table = Table(title=f"Hydra Accelerate Plan ({plan_dict['profile']})")
+    table = Table(title=f"Hydra Launch Plan ({plan_dict['profile']})")
     table.add_column("Recommended", no_wrap=True)
     table.add_column("Supported", no_wrap=True)
     table.add_column("ID")
@@ -133,7 +133,7 @@ def accelerate(
     out: Path | None = typer.Option(None, "--out", help="Write report JSON to this path."),
     verbose: bool = typer.Option(False, "--verbose", help="Print detection and plugin details to stderr."),
     quiet: bool = typer.Option(False, "--quiet", help="Suppress human-readable output."),
-    no_state_write: bool = typer.Option(False, "--no-state-write", help="Do not write .hydra/state/accelerate_latest.json."),
+    no_state_write: bool = typer.Option(False, "--no-state-write", help="Do not write .hydra/state/launch_latest.json."),
     no_timestamp: bool = typer.Option(False, "--no-timestamp", help="Disable timestamps for deterministic JSON outputs."),
 ) -> None:
     console = Console(stderr=True)
@@ -370,7 +370,7 @@ def accelerate(
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
-        _eprint(f"Accelerate failed: {type(exc).__name__}: {exc}")
+        _eprint(f"Launch failed: {type(exc).__name__}: {exc}")
         raise typer.Exit(code=1)
 
 

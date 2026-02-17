@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-ACCELERATE_SCHEMA_VERSION = "accelerate.v1"
+ACCELERATE_SCHEMA_VERSION = "launch.v1"
 PROFILE_ORDER = {
     "minimal": 0,
     "balanced": 1,
@@ -91,11 +91,11 @@ class AccelerationPlan:
         now = datetime.now(timezone.utc)
         if include_timestamp:
             created_at = now.isoformat()
-            plan_id = f"accel-{now.strftime('%Y%m%d%H%M%S')}"
+            plan_id = f"launch-{now.strftime('%Y%m%d%H%M%S')}"
         else:
             created_at = ""
             signature = "|".join([profile, *sorted(rec.action_id for rec in recommendations)])
-            plan_id = f"accel-{sha1(signature.encode('utf-8')).hexdigest()[:12]}"
+            plan_id = f"launch-{sha1(signature.encode('utf-8')).hexdigest()[:12]}"
         return cls(
             schema_version=ACCELERATE_SCHEMA_VERSION,
             plan_id=plan_id,
