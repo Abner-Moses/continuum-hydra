@@ -8,7 +8,12 @@ from typing import Any
 
 def state_path(cwd: Path | None = None) -> Path:
     base = cwd if cwd is not None else Path.cwd()
-    return base / ".continuum" / "state" / "accelerate_state.json"
+    return base / ".hydra" / "state" / "accelerate_state.json"
+
+
+def latest_path(cwd: Path | None = None) -> Path:
+    base = cwd if cwd is not None else Path.cwd()
+    return base / ".hydra" / "state" / "accelerate_latest.json"
 
 
 def utc_now() -> str:
@@ -27,9 +32,12 @@ def load_state(cwd: Path | None = None) -> dict[str, Any] | None:
 
 def save_state(payload: dict[str, Any], cwd: Path | None = None) -> Path:
     path = state_path(cwd)
+    latest = latest_path(cwd)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")
+    latest.write_text(text, encoding="utf-8")
     return path
 
 
-__all__ = ["state_path", "utc_now", "load_state", "save_state"]
+__all__ = ["state_path", "latest_path", "utc_now", "load_state", "save_state"]

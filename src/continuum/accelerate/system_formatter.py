@@ -6,8 +6,14 @@ from typing import Any
 def format_human_lines(status: dict[str, Any]) -> list[str]:
     lines = [
         f"active={status.get('active', False)}",
+        f"active_status={status.get('active_status', 'False')}",
+        f"active_requested={status.get('active_requested', False)}",
+        f"effective_active={status.get('effective_active', False)}",
         f"platform={status.get('platform', 'unknown')}",
         f"timestamp={status.get('timestamp', '')}",
+        f"applied_count={status.get('applied_count', 0)}",
+        f"skipped_count={status.get('skipped_count', 0)}",
+        f"planned_count={status.get('planned_count', 0)}",
     ]
 
     changes = status.get("changes_applied", [])
@@ -38,9 +44,13 @@ def render_status(status: dict[str, Any], verbose: bool = False) -> None:
         table.add_column("Value")
 
         table.add_row("Active", str(status.get("active", False)))
+        table.add_row("Active Status", str(status.get("active_status", "False")))
         table.add_row("Platform", str(status.get("platform", "unknown")))
         table.add_row("Timestamp", str(status.get("timestamp", "")))
         table.add_row("Changes", str(len(status.get("changes_applied", []))))
+        table.add_row("Applied", str(status.get("applied_count", 0)))
+        table.add_row("Skipped", str(status.get("skipped_count", 0)))
+        table.add_row("Planned", str(status.get("planned_count", 0)))
         table.add_row("Failures", str(len(status.get("failures", []))))
 
         console.print(table)

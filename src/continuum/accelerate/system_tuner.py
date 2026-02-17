@@ -106,217 +106,281 @@ def capture_previous_state(ctx: dict[str, Any], cpu_only: bool, gpu_only: bool) 
     return state
 
 
+def _change(
+    *,
+    name: str,
+    result: str,
+    message: str,
+    requires_root: bool,
+    category: str,
+    command: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "name": name,
+        "result": result,
+        "message": message,
+        "requires_root": requires_root,
+        "category": category,
+    }
+    if command is not None:
+        payload["command"] = command
+    return payload
+
+
+def _sorted_changes(changes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(changes, key=lambda item: item.get("name", ""))
+
+
 def apply_acceleration(
     ctx: dict[str, Any],
     previous_state: dict[str, Any],
     dry_run: bool,
     cpu_only: bool,
     gpu_only: bool,
-) -> tuple[list[dict[str, Any]], list[str]]:
+    allow_risky: bool,
+) -> tuple[list[dict[str, Any]], list[str], list[str], dict[str, Any]]:
     changes: list[dict[str, Any]] = []
     failures: list[str] = []
+    applied_actions: list[str] = []
+    applied_previous_state: dict[str, Any] = {}
 
-    def add_change(name: str, result: str, message: str, command: str | None = None) -> None:
-        payload = {"name": name, "result": result, "message": message}
-        if command is not None:
-            payload["command"] = command
-        changes.append(payload)
+    def record_applied(action_name: str, previous_key: str) -> None:
+        if action_name not in applied_actions:
+            applied_actions.append(action_name)
+        if previous_key in previous_state:
+            applied_previous_state[previous_key] = previous_state.get(previous_key)
 
     if ctx["is_linux"] and not gpu_only:
         governor = previous_state.get("cpu_governor")
         if governor is None:
-            add_change("cpu_governor", "skipped", "governor path unavailable")
+            changes.append(_change(name="cpu_governor", result="skipped", message="governor path unavailable", requires_root=True, category="cpu"))
         elif dry_run:
-            add_change("cpu_governor", "planned", "would set governor to performance", "cpupower frequency-set -g performance")
+            changes.append(_change(name="cpu_governor", result="planned", message="would set governor to performance", requires_root=True, category="cpu", command="cpupower frequency-set -g performance"))
         elif not ctx["is_root"]:
-            add_change("cpu_governor", "skipped", "root required")
+            changes.append(_change(name="cpu_governor", result="skipped", message="root required", requires_root=True, category="cpu"))
         elif shutil.which("cpupower") is None:
-            add_change("cpu_governor", "skipped", "cpupower not installed")
+            changes.append(_change(name="cpu_governor", result="skipped", message="cpupower not installed", requires_root=True, category="cpu"))
         else:
             code, _out, err = _run_cmd(["cpupower", "frequency-set", "-g", "performance"])
             if code == 0:
-                add_change("cpu_governor", "applied", "set to performance", "cpupower frequency-set -g performance")
+                changes.append(_change(name="cpu_governor", result="applied", message="set to performance", requires_root=True, category="cpu", command="cpupower frequency-set -g performance"))
+                record_applied("cpu_governor", "cpu_governor")
             else:
                 failures.append(f"cpu_governor: {err or 'unknown error'}")
-                add_change("cpu_governor", "failed", err or "unknown error")
+                changes.append(_change(name="cpu_governor", result="skipped", message=f"failed: {err or 'unknown error'}", requires_root=True, category="cpu", command="cpupower frequency-set -g performance"))
 
-        # process nice for current process only (reversible in-session)
         if hasattr(os, "nice"):
             if dry_run:
-                add_change("process_nice", "planned", "would raise process priority (nice -5)")
+                changes.append(_change(name="process_nice", result="planned", message="would raise process priority (nice -5)", requires_root=False, category="cpu"))
             else:
                 try:
                     os.nice(-5)
-                    add_change("process_nice", "applied", "raised process priority")
+                    changes.append(_change(name="process_nice", result="applied", message="raised process priority", requires_root=False, category="cpu"))
+                    record_applied("process_nice", "nice")
                 except Exception as exc:  # noqa: BLE001
-                    add_change("process_nice", "skipped", f"insufficient permission: {exc}")
+                    changes.append(_change(name="process_nice", result="skipped", message=f"insufficient permission: {exc}", requires_root=False, category="cpu"))
 
         swappiness = previous_state.get("swappiness")
         if swappiness is None:
-            add_change("swappiness", "skipped", "swappiness not available")
+            changes.append(_change(name="swappiness", result="skipped", message="swappiness not available", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
+        elif not allow_risky:
+            planned_or_not = "planned" if dry_run else "not-applied"
+            changes.append(_change(name="swappiness", result=planned_or_not, message="opt-in required for risky tunable", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
         elif dry_run:
-            add_change("swappiness", "planned", "would set vm.swappiness=10", "sysctl -w vm.swappiness=10")
+            changes.append(_change(name="swappiness", result="planned", message="would set vm.swappiness=10", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
         elif not ctx["is_root"]:
-            add_change("swappiness", "skipped", "root required")
+            changes.append(_change(name="swappiness", result="skipped", message="root required", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
         else:
             code, _out, err = _run_cmd(["sysctl", "-w", "vm.swappiness=10"])
             if code == 0:
-                add_change("swappiness", "applied", "vm.swappiness set to 10", "sysctl -w vm.swappiness=10")
+                changes.append(_change(name="swappiness", result="applied", message="vm.swappiness set to 10", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
+                record_applied("swappiness", "swappiness")
             else:
                 failures.append(f"swappiness: {err or 'unknown error'}")
-                add_change("swappiness", "failed", err or "unknown error")
+                changes.append(_change(name="swappiness", result="skipped", message=f"failed: {err or 'unknown error'}", requires_root=True, category="cpu", command="sysctl -w vm.swappiness=10"))
 
-        # ulimit soft value for current process only.
         limits = previous_state.get("rlimit_nofile") or {}
         soft = limits.get("soft")
         hard = limits.get("hard")
         if soft is None or hard is None:
-            add_change("ulimit_nofile", "skipped", "rlimit unavailable")
+            changes.append(_change(name="ulimit_nofile", result="skipped", message="rlimit unavailable", requires_root=False, category="cpu"))
         elif dry_run:
-            add_change("ulimit_nofile", "planned", "would raise soft open-file limit")
+            changes.append(_change(name="ulimit_nofile", result="planned", message="would raise soft open-file limit", requires_root=False, category="cpu"))
         else:
             target = min(int(hard), max(int(soft), 65535))
             try:
                 resource.setrlimit(resource.RLIMIT_NOFILE, (target, int(hard)))
-                add_change("ulimit_nofile", "applied", f"soft limit set to {target}")
+                changes.append(_change(name="ulimit_nofile", result="applied", message=f"soft limit set to {target}", requires_root=False, category="cpu"))
+                record_applied("ulimit_nofile", "rlimit_nofile")
             except Exception as exc:  # noqa: BLE001
-                add_change("ulimit_nofile", "skipped", f"unable to set rlimit: {exc}")
+                changes.append(_change(name="ulimit_nofile", result="skipped", message=f"unable to set rlimit: {exc}", requires_root=False, category="cpu"))
 
     if ctx["is_windows"] and not gpu_only:
         if dry_run:
-            changes.append({"name": "windows_process_priority", "result": "planned", "message": "would set HIGH priority"})
+            changes.append(_change(name="windows_process_priority", result="planned", message="would set HIGH priority", requires_root=False, category="cpu"))
         else:
             try:
                 import psutil  # type: ignore
 
                 process = psutil.Process()
                 process.nice(psutil.HIGH_PRIORITY_CLASS)
-                changes.append({"name": "windows_process_priority", "result": "applied", "message": "set HIGH priority"})
+                changes.append(_change(name="windows_process_priority", result="applied", message="set HIGH priority", requires_root=False, category="cpu"))
+                record_applied("windows_process_priority", "process_priority")
             except Exception as exc:  # noqa: BLE001
-                changes.append({"name": "windows_process_priority", "result": "skipped", "message": f"{exc}"})
+                changes.append(_change(name="windows_process_priority", result="skipped", message=f"{exc}", requires_root=False, category="cpu"))
 
-        if dry_run:
-            changes.append({"name": "windows_power_plan", "result": "planned", "message": "would set high performance power plan"})
+        if not allow_risky:
+            changes.append(_change(name="windows_power_plan", result="not-applied", message="opt-in required for risky tunable", requires_root=False, category="cpu"))
+        elif dry_run:
+            changes.append(_change(name="windows_power_plan", result="planned", message="would set high performance power plan", requires_root=False, category="cpu", command="powercfg /setactive SCHEME_MIN"))
         else:
             code, _out, err = _run_cmd(["powercfg", "/setactive", "SCHEME_MIN"])
             if code == 0:
-                changes.append({"name": "windows_power_plan", "result": "applied", "message": "set high performance power plan"})
+                changes.append(_change(name="windows_power_plan", result="applied", message="set high performance power plan", requires_root=False, category="cpu", command="powercfg /setactive SCHEME_MIN"))
+                record_applied("windows_power_plan", "power_plan_guid")
             else:
-                changes.append({"name": "windows_power_plan", "result": "skipped", "message": err or "unable to change power plan"})
+                changes.append(_change(name="windows_power_plan", result="skipped", message=err or "unable to change power plan", requires_root=False, category="cpu", command="powercfg /setactive SCHEME_MIN"))
 
     if ctx["nvidia_present"] and not cpu_only:
         if dry_run:
-            changes.append({"name": "nvidia_persistence", "result": "planned", "message": "would enable persistence mode", "command": "nvidia-smi -pm 1"})
+            changes.append(_change(name="nvidia_persistence", result="planned", message="would enable persistence mode", requires_root=True, category="gpu", command="nvidia-smi -pm 1"))
         elif not ctx["is_root"]:
-            changes.append({"name": "nvidia_persistence", "result": "skipped", "message": "root/admin may be required"})
+            changes.append(_change(name="nvidia_persistence", result="skipped", message="root/admin may be required", requires_root=True, category="gpu", command="nvidia-smi -pm 1"))
         else:
             code, _out, err = _run_cmd(["nvidia-smi", "-pm", "1"])
             if code == 0:
-                changes.append({"name": "nvidia_persistence", "result": "applied", "message": "enabled persistence mode", "command": "nvidia-smi -pm 1"})
+                changes.append(_change(name="nvidia_persistence", result="applied", message="enabled persistence mode", requires_root=True, category="gpu", command="nvidia-smi -pm 1"))
+                record_applied("nvidia_persistence", "nvidia_persistence_mode")
             else:
-                changes.append({"name": "nvidia_persistence", "result": "skipped", "message": err or "unable to enable persistence mode"})
+                changes.append(_change(name="nvidia_persistence", result="skipped", message=err or "unable to enable persistence mode", requires_root=True, category="gpu", command="nvidia-smi -pm 1"))
     elif not gpu_only:
-        changes.append({"name": "nvidia_persistence", "result": "skipped", "message": "nvidia-smi not found"})
+        changes.append(_change(name="nvidia_persistence", result="skipped", message="nvidia-smi not found", requires_root=True, category="gpu", command="nvidia-smi -pm 1"))
 
-    return changes, failures
+    return _sorted_changes(changes), failures, sorted(applied_actions), applied_previous_state
 
 
 def restore_acceleration(
     ctx: dict[str, Any],
     previous_state: dict[str, Any],
+    applied_actions: list[str],
     dry_run: bool,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     changes: list[dict[str, Any]] = []
     failures: list[str] = []
+    applied_set = set(applied_actions)
 
-    def add_change(name: str, result: str, message: str, command: str | None = None) -> None:
-        payload = {"name": name, "result": result, "message": message}
-        if command is not None:
-            payload["command"] = command
-        changes.append(payload)
+    def mark_not_applied(name: str, category: str) -> None:
+        changes.append(_change(name=name, result="not-applied", message="was not applied during --on", requires_root=False, category=category))
 
-    if ctx["is_linux"]:
+    if "cpu_governor" in applied_set:
         governor = previous_state.get("cpu_governor")
         if governor:
             if dry_run:
-                add_change("cpu_governor", "planned", f"would restore governor={governor}")
+                changes.append(_change(name="cpu_governor", result="planned", message=f"would restore governor={governor}", requires_root=True, category="cpu"))
             elif ctx["is_root"] and shutil.which("cpupower"):
                 code, _out, err = _run_cmd(["cpupower", "frequency-set", "-g", str(governor)])
                 if code == 0:
-                    add_change("cpu_governor", "restored", f"restored governor={governor}")
+                    changes.append(_change(name="cpu_governor", result="restored", message=f"restored governor={governor}", requires_root=True, category="cpu"))
                 else:
                     failures.append(f"cpu_governor restore: {err or 'unknown error'}")
-                    add_change("cpu_governor", "failed", err or "unknown error")
+                    changes.append(_change(name="cpu_governor", result="skipped", message=f"failed: {err or 'unknown error'}", requires_root=True, category="cpu"))
             else:
-                add_change("cpu_governor", "skipped", "root/cpupower unavailable for restore")
+                changes.append(_change(name="cpu_governor", result="skipped", message="root/cpupower unavailable for restore", requires_root=True, category="cpu"))
+    else:
+        mark_not_applied("cpu_governor", "cpu")
 
+    if "swappiness" in applied_set:
         swappiness = previous_state.get("swappiness")
         if swappiness is not None:
             if dry_run:
-                add_change("swappiness", "planned", f"would restore vm.swappiness={swappiness}")
+                changes.append(_change(name="swappiness", result="planned", message=f"would restore vm.swappiness={swappiness}", requires_root=True, category="cpu", command=f"sysctl -w vm.swappiness={int(swappiness)}"))
             elif ctx["is_root"]:
                 code, _out, err = _run_cmd(["sysctl", "-w", f"vm.swappiness={int(swappiness)}"])
                 if code == 0:
-                    add_change("swappiness", "restored", f"restored vm.swappiness={swappiness}")
+                    changes.append(_change(name="swappiness", result="restored", message=f"restored vm.swappiness={swappiness}", requires_root=True, category="cpu", command=f"sysctl -w vm.swappiness={int(swappiness)}"))
                 else:
-                    add_change("swappiness", "failed", err or "unknown error")
+                    failures.append(f"swappiness restore: {err or 'unknown error'}")
+                    changes.append(_change(name="swappiness", result="skipped", message=f"failed: {err or 'unknown error'}", requires_root=True, category="cpu"))
             else:
-                add_change("swappiness", "skipped", "root required for restore")
+                changes.append(_change(name="swappiness", result="skipped", message="root required for restore", requires_root=True, category="cpu"))
+    else:
+        mark_not_applied("swappiness", "cpu")
 
+    if "ulimit_nofile" in applied_set:
         limits = previous_state.get("rlimit_nofile") or {}
         soft = limits.get("soft")
         hard = limits.get("hard")
         if soft is not None and hard is not None:
             if dry_run:
-                add_change("ulimit_nofile", "planned", f"would restore soft={soft}, hard={hard}")
+                changes.append(_change(name="ulimit_nofile", result="planned", message=f"would restore soft={soft}, hard={hard}", requires_root=False, category="cpu"))
             else:
                 try:
                     resource.setrlimit(resource.RLIMIT_NOFILE, (int(soft), int(hard)))
-                    add_change("ulimit_nofile", "restored", f"restored soft={soft}, hard={hard}")
+                    changes.append(_change(name="ulimit_nofile", result="restored", message=f"restored soft={soft}, hard={hard}", requires_root=False, category="cpu"))
                 except Exception as exc:  # noqa: BLE001
-                    add_change("ulimit_nofile", "skipped", f"unable to restore rlimit: {exc}")
+                    changes.append(_change(name="ulimit_nofile", result="skipped", message=f"unable to restore rlimit: {exc}", requires_root=False, category="cpu"))
+    else:
+        mark_not_applied("ulimit_nofile", "cpu")
 
-    if ctx["nvidia_present"]:
+    if "nvidia_persistence" in applied_set:
         previous = previous_state.get("nvidia_persistence_mode")
         if previous in {"enabled", "disabled"}:
             target = "1" if previous == "enabled" else "0"
             if dry_run:
-                add_change("nvidia_persistence", "planned", f"would restore persistence={previous}")
+                changes.append(_change(name="nvidia_persistence", result="planned", message=f"would restore persistence={previous}", requires_root=True, category="gpu", command=f"nvidia-smi -pm {target}"))
             elif ctx["is_root"]:
                 code, _out, err = _run_cmd(["nvidia-smi", "-pm", target])
                 if code == 0:
-                    add_change("nvidia_persistence", "restored", f"restored persistence={previous}")
+                    changes.append(_change(name="nvidia_persistence", result="restored", message=f"restored persistence={previous}", requires_root=True, category="gpu", command=f"nvidia-smi -pm {target}"))
                 else:
-                    add_change("nvidia_persistence", "failed", err or "unknown error")
+                    failures.append(f"nvidia_persistence restore: {err or 'unknown error'}")
+                    changes.append(_change(name="nvidia_persistence", result="skipped", message=f"failed: {err or 'unknown error'}", requires_root=True, category="gpu"))
             else:
-                add_change("nvidia_persistence", "skipped", "root/admin may be required for restore")
+                changes.append(_change(name="nvidia_persistence", result="skipped", message="root/admin may be required for restore", requires_root=True, category="gpu"))
+    else:
+        mark_not_applied("nvidia_persistence", "gpu")
 
-    if ctx["is_windows"]:
+    if "windows_process_priority" in applied_set:
         priority = previous_state.get("process_priority")
         if priority is not None:
             if dry_run:
-                add_change("windows_process_priority", "planned", f"would restore priority={priority}")
+                changes.append(_change(name="windows_process_priority", result="planned", message=f"would restore priority={priority}", requires_root=False, category="cpu"))
             else:
                 try:
                     import psutil  # type: ignore
 
                     psutil.Process().nice(int(priority))
-                    add_change("windows_process_priority", "restored", f"restored priority={priority}")
+                    changes.append(_change(name="windows_process_priority", result="restored", message=f"restored priority={priority}", requires_root=False, category="cpu"))
                 except Exception as exc:  # noqa: BLE001
-                    add_change("windows_process_priority", "skipped", f"unable to restore priority: {exc}")
+                    changes.append(_change(name="windows_process_priority", result="skipped", message=f"unable to restore priority: {exc}", requires_root=False, category="cpu"))
 
+    if "windows_power_plan" in applied_set:
         power_plan = previous_state.get("power_plan_guid")
         if power_plan:
             if dry_run:
-                add_change("windows_power_plan", "planned", f"would restore power plan={power_plan}")
+                changes.append(_change(name="windows_power_plan", result="planned", message=f"would restore power plan={power_plan}", requires_root=False, category="cpu", command=f"powercfg /setactive {power_plan}"))
             else:
                 code, _out, err = _run_cmd(["powercfg", "/setactive", str(power_plan)])
                 if code == 0:
-                    add_change("windows_power_plan", "restored", f"restored power plan={power_plan}")
+                    changes.append(_change(name="windows_power_plan", result="restored", message=f"restored power plan={power_plan}", requires_root=False, category="cpu", command=f"powercfg /setactive {power_plan}"))
                 else:
-                    add_change("windows_power_plan", "skipped", err or "unable to restore power plan")
+                    changes.append(_change(name="windows_power_plan", result="skipped", message=err or "unable to restore power plan", requires_root=False, category="cpu"))
 
-    return changes, failures
+    if "process_nice" in applied_set:
+        previous_nice = previous_state.get("nice")
+        if previous_nice is not None and hasattr(os, "nice"):
+            if dry_run:
+                changes.append(_change(name="process_nice", result="planned", message=f"would restore nice={previous_nice}", requires_root=False, category="cpu"))
+            else:
+                try:
+                    delta = int(previous_nice) - os.nice(0)
+                    if delta != 0:
+                        os.nice(delta)
+                    changes.append(_change(name="process_nice", result="restored", message=f"restored nice={previous_nice}", requires_root=False, category="cpu"))
+                except Exception as exc:  # noqa: BLE001
+                    changes.append(_change(name="process_nice", result="skipped", message=f"unable to restore nice: {exc}", requires_root=False, category="cpu"))
+
+    return _sorted_changes(changes), failures
 
 
 __all__ = [
