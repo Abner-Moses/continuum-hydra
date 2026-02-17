@@ -51,6 +51,7 @@ def render_profile_human(report: dict[str, Any], console: Console | None = None)
             table.add_row(_style_status(row["status"]), row["item"], row["result"], row["benchmark"])
         active_console.print(table)
     _render_gpu_sustained_rich(report, active_console)
+    _render_analysis_rich(report, active_console)
 
     static = report.get("static_profile", {}) if isinstance(report, dict) else {}
     notes = static.get("notes") if isinstance(static, dict) else None
@@ -68,6 +69,7 @@ def _render_profile_compact(report: dict[str, Any]) -> None:
         for row in rows:
             print(f"[{row['status']}] {row['item']} | {row['result']} | {row['benchmark']}")
     _render_gpu_sustained_compact(report)
+    _render_analysis_compact(report)
 
     static = report.get("static_profile", {}) if isinstance(report, dict) else {}
     notes = static.get("notes") if isinstance(static, dict) else None
@@ -218,6 +220,27 @@ def _build_status_rows(report: dict[str, Any]) -> list[dict[str, str]]:
                 }
             )
 
+    analysis = report.get("analysis") if isinstance(report, dict) else None
+    if isinstance(analysis, dict):
+        primary = analysis.get("primary_bottleneck")
+        confidence = analysis.get("confidence")
+        rows.append(
+            {
+                "status": _status_for_value(primary),
+                "item": "analysis.primary_bottleneck",
+                "result": "null" if primary is None else str(primary),
+                "benchmark": "analysis",
+            }
+        )
+        rows.append(
+            {
+                "status": _status_for_value(confidence),
+                "item": "analysis.confidence",
+                "result": "null" if confidence is None else str(confidence),
+                "benchmark": "analysis",
+            }
+        )
+
     return rows
 
 
@@ -310,6 +333,55 @@ def _render_gpu_sustained_compact(report: dict[str, Any]) -> None:
     print(f"mean_iter_per_sec: {'null' if gpu.get('mean_iter_per_sec') is None else gpu.get('mean_iter_per_sec')}")
     print(f"p95_iter_per_sec: {'null' if gpu.get('p95_iter_per_sec') is None else gpu.get('p95_iter_per_sec')}")
     print(f"std_iter_per_sec: {'null' if gpu.get('std_iter_per_sec') is None else gpu.get('std_iter_per_sec')}")
+
+
+def _render_analysis_rich(report: dict[str, Any], console: Console) -> None:
+    analysis = report.get("analysis") if isinstance(report, dict) else None
+    if not isinstance(analysis, dict):
+        return
+
+    section = Table(title="Analysis")
+    section.add_column("Field", overflow="fold")
+    section.add_column("Value", overflow="fold")
+    section.add_row("primary_bottleneck", "null" if analysis.get("primary_bottleneck") is None else str(analysis.get("primary_bottleneck")))
+    section.add_row("secondary_bottleneck", "null" if analysis.get("secondary_bottleneck") is None else str(analysis.get("secondary_bottleneck")))
+    section.add_row("confidence", "null" if analysis.get("confidence") is None else str(analysis.get("confidence")))
+    console.print(section)
+
+    reasons = analysis.get("reasons")
+    if isinstance(reasons, list) and reasons:
+        console.print("Top Reasons:")
+        for reason in reasons[:3]:
+            console.print(f"- {reason}")
+
+    recommendations = analysis.get("recommendations")
+    if isinstance(recommendations, list) and recommendations:
+        console.print("Recommendations:")
+        for rec in recommendations[:3]:
+            console.print(f"- {rec}")
+
+
+def _render_analysis_compact(report: dict[str, Any]) -> None:
+    analysis = report.get("analysis") if isinstance(report, dict) else None
+    if not isinstance(analysis, dict):
+        return
+
+    print("Analysis:")
+    print(f"primary_bottleneck: {'null' if analysis.get('primary_bottleneck') is None else analysis.get('primary_bottleneck')}")
+    print(f"secondary_bottleneck: {'null' if analysis.get('secondary_bottleneck') is None else analysis.get('secondary_bottleneck')}")
+    print(f"confidence: {'null' if analysis.get('confidence') is None else analysis.get('confidence')}")
+
+    reasons = analysis.get("reasons")
+    if isinstance(reasons, list) and reasons:
+        print("Top Reasons:")
+        for reason in reasons[:3]:
+            print(f"- {reason}")
+
+    recommendations = analysis.get("recommendations")
+    if isinstance(recommendations, list) and recommendations:
+        print("Recommendations:")
+        for rec in recommendations[:3]:
+            print(f"- {rec}")
 
 
 __all__ = [

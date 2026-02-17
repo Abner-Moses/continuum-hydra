@@ -24,6 +24,7 @@ except Exception:  # pragma: no cover
     typer = _TyperShim()  # type: ignore[assignment]
 
 from continuum.profiler.formatters import build_profile_report, render_profile_human, write_profile_json
+from continuum.profiler.analysis import classify_bottleneck
 from continuum.profiler.cpu_benchmark import run_cpu_benchmark
 from continuum.profiler.gpu_benchmark import run_gpu_benchmark
 from continuum.profiler.memory_bandwidth import run_memory_bandwidth
@@ -115,6 +116,7 @@ def profile_command(
             benchmarks_payload = {}
 
         report = build_profile_report(static_profile, benchmarks=benchmarks_payload)
+        report["analysis"] = classify_bottleneck(report)
 
         effective_output_format = _resolve_output_format(
             output_format=output_format,
