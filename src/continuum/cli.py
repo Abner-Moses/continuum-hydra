@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from continuum.accelerate.cli import app as accelerate_app
+from continuum.accelerate.cli import launch_command
 from continuum.doctor.main import doctor_command
 from continuum.profiler.main import profile_command
 from continuum.setup.main import setup_command
@@ -18,7 +18,10 @@ def main() -> None:
 
 
 app.command(name="doctor")(doctor_command)
-app.add_typer(accelerate_app, name="launch")
+app.command(
+    "launch",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(launch_command)
 app.command(name="profile")(profile_command)
 app.command(name="setup")(setup_command)
 
