@@ -2,14 +2,15 @@
 
 Hydra is a performance-first ML systems toolkit under the Continuum infrastructure initiative.
 
-It currently ships two production CLI flows:
+It ships three production CLI flows:
 - `continuum doctor`: static system/runtime diagnostics before training
-- `continuum profile`: static + sustained benchmark profiling with analysis and remediation hints
+- `continuum profile`: static + sustained benchmark profiling with bottleneck analysis and remediation
+- `continuum setup`: environment bootstrap for NumPy/PyTorch with reproducibility state artifacts
 
 ## Design Principles
 
-- Structured diagnostics with explicit `PASS`/`WARN`/`FAIL` states
-- No silent system modification
+- Structured diagnostics with explicit `PASS`/`WARN`/`FAIL`/`SKIP` states
+- No silent system modification in `doctor`/`profile` flows
 - Reproducible JSON artifacts
 - Graceful degradation when optional dependencies are missing
 - Infrastructure-grade visibility for ML environments
@@ -42,15 +43,68 @@ python -m pip install -e .[profile]
 ## CLI Overview
 
 ```bash
+continuum --help
 continuum doctor --help
 continuum profile --help
+continuum setup --help
 ```
 
-Also available as a direct script entrypoint:
+Also available as a direct profiler entrypoint:
 
 ```bash
 continuum-profile --help
 ```
+
+## Feature Inventory
+
+### `continuum doctor` checks (all implemented)
+
+- `environment.python_version`
+- `environment.venv`
+- `environment.runtime`
+- `driver.nvidia_smi`
+- `gpu.nvml_available`
+- `gpu.nvml_devices`
+- `runtime.gpu_passthrough`
+- `gpu.persistence_mode`
+- `gpu.clock_throttle_reasons`
+- `cuda.driver_version`
+- `cuda.toolkit_nvcc`
+- `cuda.torch_cuda_version`
+- `cuda.driver_cuda_compat`
+- `cuda.runtime_hint`
+- `pytorch.installed`
+- `pytorch.cuda_available`
+- `pytorch.cuda_version`
+- `gpu.device_properties`
+- `nccl.env_config`
+- `nccl.torch_backend`
+- `system.dev_shm`
+
+### `continuum profile` modules (all implemented)
+
+- Static profile collection (`cpu`, `memory`, `storage`, `os`, `runtime`, `notes`)
+- Sustained CPU benchmark
+- Sustained memory bandwidth benchmark (NumPy path + stdlib fallback)
+- Sustained GPU benchmark (CUDA/MPS when available)
+- Disk random I/O benchmark
+- Bottleneck classifier (`primary_bottleneck`, `secondary_bottleneck`, confidence, reasons, recommendations)
+- Remediation action generator (`priority`, `actions`)
+- Unified human + JSON formatting layer
+
+### `continuum setup` capabilities (all implemented)
+
+- Optional install/validation of PyTorch (`--with-torch/--no-torch`)
+- Custom torch package spec and index (`--torch-spec`, `--torch-index`)
+- Custom NumPy package spec (`--numpy-spec`)
+- Optional upgrade behavior (`--upgrade`)
+- Optional requirements file install (`--requirements`)
+- Dry-run planning mode (`--dry-run`)
+- Manifest and reproducibility artifact generation:
+  - `.continuum/state/env_manifest.json`
+  - `.continuum/state/requirements.txt`
+  - `.continuum/state/README.md`
+- Linux CUDA torch enforcement (fails setup when torch is CPU-only on Linux)
 
 ## `continuum doctor`
 
@@ -67,11 +121,12 @@ continuum doctor --only gpu,cuda
 continuum doctor --exclude nccl.env_config
 continuum doctor --list-checks
 continuum doctor --deterministic
+continuum doctor --verbose
 ```
 
 Doctor coverage:
 - Environment/runtime (Python, isolation, container/WSL hints)
-- Driver/GPU discovery (`nvidia-smi`, NVML, visibility)
+- Driver/GPU discovery (`nvidia-smi`, NVML, visibility, passthrough hints)
 - CUDA toolkit/runtime compatibility hints
 - PyTorch install/runtime checks
 - GPU properties/health hints
@@ -108,29 +163,14 @@ Doctor exit codes:
 
 Profiler produces a combined machine + sustained throughput profile.
 
-### Implemented profiler feature set
-
-- Feature #1: Static Profile
-  - CPU model/cores, RAM, storage/root fs hints, OS/kernel, Python/Torch runtime facts
-- Feature #2: Sustained CPU benchmark
-  - Timed warmup + measurement loop (iter/sec stats)
-- Feature #3: Sustained Memory Bandwidth benchmark
-  - Timed copy throughput with NumPy path + stdlib fallback
-- Feature #4: Sustained GPU compute benchmark
-  - CUDA/MPS timed matmul loop (iter/sec stats), dependency-safe
-- Feature #5: Bottleneck classification
-  - Deterministic heuristic analysis with confidence, reasons, recommendations
-- Feature #6: Remediation engine
-  - Priority + actionable suggestions derived from analysis
-- Feature #7: Realistic disk random I/O benchmark
-  - Timed random reads with MB/s + IOPS distribution stats
-
-### Profiler command examples
+Profiler command examples:
 
 ```bash
 continuum profile
 continuum profile --static-only
 continuum profile --benchmarks static,cpu,memory,gpu,disk
+continuum profile --no-static
+continuum profile --no-benchmarks
 
 continuum profile --cpu-warmup 2 --cpu-duration 8
 continuum profile --mem-warmup 2 --mem-duration 8 --mem-mb 128
@@ -148,11 +188,11 @@ continuum profile --no-write
 continuum profile --verbose
 ```
 
-### Profiler output behavior
+Profiler output behavior:
 
 - Terminal output:
-  - One combined table with proper headers covering static profile, all benchmarks, analysis, and remediation.
-  - Rows carry `PASS`/`WARN` status for readability.
+  - One combined table covering static profile, benchmarks, analysis, and remediation.
+  - Rows carry `PASS`/`WARN`/`FAIL` status tags for readability.
 - JSON artifact:
   - Default path: `.hydra/reports/profile_YYYYMMDD_HHMMSS.json`
   - Stable `schema_version: "1.0.0"`
@@ -176,7 +216,45 @@ continuum profile --verbose
 
 Notes:
 - Optional dependencies (`torch`, `numpy`, `psutil`) never hard-crash profiling.
-- Missing backends/dependencies produce partial/null payloads and explanatory notes.
+- Missing backends/dependencies produce partial/null payloads plus explanatory notes.
+
+Profile exit codes:
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Successful run |
+| `2` | Invalid CLI value (for example unknown benchmark or output format) |
+| `4` | Tool-level crash/unhandled failure |
+
+## `continuum setup`
+
+Setup installs baseline ML dependencies into the active Python environment and records reproducibility metadata.
+
+Common usage:
+
+```bash
+continuum setup
+continuum setup --dry-run
+continuum setup --no-torch
+continuum setup --torch-spec "torch==2.5.*" --torch-index https://download.pytorch.org/whl/cu121
+continuum setup --numpy-spec "numpy==1.26.4"
+continuum setup --upgrade
+continuum setup --requirements requirements.txt
+continuum setup --verbose
+```
+
+Setup artifacts:
+- `.continuum/state/env_manifest.json`: environment snapshot + installed package metadata
+- `.continuum/state/requirements.txt`: pinned requirements snapshot generated from installed package versions
+- `.continuum/state/README.md`: local replay instructions and snapshot summary
+
+Setup exit codes:
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Successful run |
+| `2` | Invalid user input (for example missing requirements file path) |
+| `4` | Install/validation/runtime failure |
 
 ## Testing
 
@@ -187,8 +265,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 Profiler-focused tests include:
-- `tests/test_profile_main.py` (CLI routing/selection/output behavior)
-- `tests/test_profile_static.py` (static profile probes and formatter fallback)
+- `tests/test_profile_main.py`
+- `tests/test_profile_static.py`
 - `tests/test_cpu_benchmark.py`
 - `tests/test_memory_bandwidth.py`
 - `tests/test_gpu_benchmark.py`
@@ -204,6 +282,10 @@ Doctor-focused tests include:
 - `tests/test_cuda_checks.py`
 - `tests/test_pytorch_checks.py`
 - `tests/test_nccl_checks.py`
+- `tests/test_gpu_props_checks.py`
+
+Setup-focused tests include:
+- `tests/test_setup_main.py`
 
 Smoke flow:
 
@@ -215,10 +297,12 @@ python -m pip install -e .[profile]
 continuum doctor --deterministic --json --no-write
 continuum profile --static-only --json --no-write
 continuum profile --benchmarks static,cpu,memory,gpu,disk --output-format both
+continuum setup --dry-run
 ```
 
 ## Status
 
-![Status](https://img.shields.io/badge/status-doctor%2Bprofiler-active-green)
-![Profiler](https://img.shields.io/badge/profiler-features%201--7-implemented-blue)
+![Status](https://img.shields.io/badge/status-doctor%2Bprofiler%2Bsetup-active-green)
+![Doctor](https://img.shields.io/badge/doctor-checks%2021-implemented-blue)
+![Profiler](https://img.shields.io/badge/profiler-modules%208-implemented-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
