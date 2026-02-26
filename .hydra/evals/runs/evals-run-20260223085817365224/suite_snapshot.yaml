@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "case_id": "core-pass-1",
+      "must_be_grounded": true,
+      "must_cite": true,
+      "must_not_say": [
+        "hallucinated"
+      ],
+      "must_say_idk_if_insufficient": false,
+      "question": "What year was Project Hydra founded?",
+      "sources": [
+        {
+          "id": "S1",
+          "text": "Project Hydra was founded in 2024 by a small research team."
+        }
+      ]
+    }
+  ],
+  "model_prompt_template": "Answer the question using only the provided sources. Cite sources using [S#]. If information is missing, say \"I don't know\".\n\nSources:\n{sources}\n\nQuestion: {question}\nAnswer:",
+  "name": "core",
+  "schema_version": "evals.suite.v1"
+}

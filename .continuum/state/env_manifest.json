@@ -1,0 +1,15 @@
+{
+  "python_version": "3.12.3",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "architecture": "x86_64",
+  "venv": true,
+  "installed": {
+    "numpy": "2.4.2",
+    "torch": "2.10.0+cu128",
+    "torch_cuda_available": true,
+    "torch_cuda_version": "12.8"
+  },
+  "timestamp": "2026-02-18T04:37:17.004420Z",
+  "continuum_version": "0.1.0",
+  "notes": []
+}

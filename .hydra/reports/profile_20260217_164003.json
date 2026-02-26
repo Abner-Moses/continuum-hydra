@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0.0",
+  "static_profile": {
+    "cpu": {
+      "model": "AMD Ryzen 7 7735HS with Radeon Graphics",
+      "cores_physical": 8,
+      "cores_logical": 16,
+      "arch": "x86_64"
+    },
+    "memory": {
+      "total_bytes": 7904358400
+    },
+    "storage": {
+      "root_mount": "/",
+      "root_device": "/dev/sdd",
+      "is_nvme": false,
+      "is_ssd": false,
+      "filesystem_type": "ext4",
+      "notes": []
+    },
+    "os": {
+      "name": "Ubuntu 24.04.3 LTS",
+      "version": "24.04.3 LTS (Noble Numbat)",
+      "kernel": "6.6.87.2-microsoft-standard-WSL2"
+    },
+    "runtime": {
+      "python_version": "3.12.3",
+      "torch_version": "2.10.0+cu128",
+      "torch_cuda_available": true,
+      "torch_cuda_version": "12.8",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+    },
+    "notes": []
+  },
+  "benchmark_results": [],
+  "benchmarks": {
+    "cpu_sustained": {
+      "mean_iter_per_sec": 11.782645,
+      "std_iter_per_sec": 1.922917,
+      "p50_iter_per_sec": 11.971882,
+      "p95_iter_per_sec": 14.401916,
+      "iterations": 92,
+      "duration_sec": 8.061222
+    },
+    "memory_bandwidth": {
+      "mean_gbps": 11.470574,
+      "std_gbps": 0.695755,
+      "p50_gbps": 11.63113,
+      "p95_gbps": 12.299285,
+      "iterations": 341,
+      "duration_sec": 8.015844,
+      "bytes_per_iter": 268435456
+    },
+    "gpu_sustained": {
+      "backend": "cuda",
+      "device": "cuda:0",
+      "dtype": "float16",
+      "mean_iter_per_sec": 152.449812,
+      "std_iter_per_sec": 5.029801,
+      "p50_iter_per_sec": 152.500769,
+      "p95_iter_per_sec": 159.265358,
+      "iterations": 1218,
+      "duration_sec": 8.005568
+    },
+    "disk_random_io": {
+      "mean_read_mb_s": 1031.980488,
+      "std_read_mb_s": 151.100075,
+      "p50_read_mb_s": 1076.992186,
+      "p95_read_mb_s": 1181.564292,
+      "mean_iops": 264187.004841,
+      "iterations": 1413533,
+      "duration_sec": 8.000002
+    }
+  },
+  "analysis": {
+    "primary_bottleneck": "memory_bandwidth",
+    "secondary_bottleneck": null,
+    "confidence": 0.67,
+    "signals": {
+      "cpu_cv": 0.163199,
+      "mem_cv": 0.060656,
+      "gpu_cv": 0.032993,
+      "cpu_stability_ratio": 1.222299,
+      "mem_stability_ratio": 1.072247,
+      "gpu_stability_ratio": 1.044707,
+      "mem_expected_floor_gbps": 25.0,
+      "disk_expected_floor_mb_s": 40.0,
+      "disk_mean_read_mb_s": 1031.980488
+    },
+    "reasons": [
+      "Memory bandwidth mean 11.471 GB/s below heuristic floor 25.0 GB/s."
+    ],
+    "recommendations": [
+      "Prefer bf16/fp16 where possible; fp32 increases bandwidth pressure.",
+      "Increase batch size only if it improves compute utilization without OOM.",
+      "Use fused attention/kernels when available."
+    ]
+  },
+  "remediation": {
+    "priority": "medium",
+    "actions": [
+      {
+        "title": "Switch to fp16/bf16 precision",
+        "impact": "high",
+        "difficulty": "medium",
+        "reason": "Reduced bytes per operation lowers memory pressure."
+      },
+      {
+        "title": "Use fused attention/kernels",
+        "impact": "high",
+        "difficulty": "high",
+        "reason": "Kernel fusion reduces memory traffic and launch overhead."
+      },
+      {
+        "title": "Increase arithmetic intensity",
+        "impact": "medium",
+        "difficulty": "medium",
+        "reason": "Larger batch/matmul can improve compute-to-memory ratio."
+      },
+      {
+        "title": "Use dataset sharding",
+        "impact": "medium",
+        "difficulty": "medium",
+        "reason": "Sharding improves data locality and reduces input stalls."
+      }
+    ]
+  }
+}

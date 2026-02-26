@@ -1,0 +1,28 @@
+{
+  "accelerate_state_path": "/home/rishi/continuum-hydra/.hydra/state/accelerate_state.json",
+  "accelerate_status": "Partial",
+  "accelerate_used": true,
+  "attempts": [],
+  "command_argv": [
+    "/home/rishi/continuum-hydra/.venv/bin/python3",
+    "-u",
+    "tests/fixtures/print_args.py",
+    "--output-dir",
+    "./outputs/mmfine_100m"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "latest_checkpoint": null,
+  "log_path": "/home/rishi/continuum-hydra/.hydra/launch/runs/launch-run-20260217162249/launch.log",
+  "max_restarts": 1,
+  "mode": "dry-run",
+  "restarts_used": 0,
+  "run_id": "launch-run-20260217162249",
+  "schema_version": "launch.runtime.v1",
+  "script": "tests/fixtures/print_args.py",
+  "script_args": [
+    "--output-dir",
+    "./outputs/mmfine_100m"
+  ],
+  "status": "dry-run"
+}

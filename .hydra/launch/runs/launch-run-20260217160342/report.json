@@ -1,0 +1,20 @@
+{
+  "attempts": [],
+  "command_argv": [
+    "/home/rishi/continuum-hydra/.venv/bin/python3",
+    "-u",
+    "test_training/train_100m_mmfine_reason.py"
+  ],
+  "error": "Interrupted by user",
+  "exit_code": 130,
+  "latest_checkpoint": null,
+  "log_path": "/home/rishi/continuum-hydra/.hydra/launch/runs/launch-run-20260217160342/launch.log",
+  "max_restarts": 1,
+  "mode": "apply",
+  "restarts_used": 0,
+  "run_id": "launch-run-20260217160342",
+  "schema_version": "launch.runtime.v1",
+  "script": "test_training/train_100m_mmfine_reason.py",
+  "script_args": [],
+  "status": "interrupted"
+}

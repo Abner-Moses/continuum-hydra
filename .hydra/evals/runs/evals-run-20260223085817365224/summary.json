@@ -1,0 +1,15 @@
+{
+  "citation_present_rate": 1.0,
+  "created_at": "2026-02-23T08:58:17.366602+00:00",
+  "forbidden_hits": 0,
+  "grounded_rate": 1.0,
+  "idk_rate": 0.0,
+  "model_spec": "dummy",
+  "pass_count": 1,
+  "pass_rate": 1.0,
+  "run_id": "evals-run-20260223085817365224",
+  "run_path": "/home/rishi/continuum-hydra/.hydra/evals/runs/evals-run-20260223085817365224",
+  "schema_version": "evals.run.v1",
+  "suite": "core",
+  "total_cases": 1
+}

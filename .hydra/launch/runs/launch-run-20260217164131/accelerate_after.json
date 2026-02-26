@@ -1,0 +1,51 @@
+{
+  "active": false,
+  "active_requested": false,
+  "active_status": "False",
+  "applied_actions": [],
+  "applied_count": 0,
+  "changes_applied": [
+    {
+      "category": "cpu",
+      "message": "was not applied during --on",
+      "name": "cpu_governor",
+      "requires_root": false,
+      "result": "not-applied"
+    },
+    {
+      "category": "gpu",
+      "message": "was not applied during --on",
+      "name": "nvidia_persistence",
+      "requires_root": false,
+      "result": "not-applied"
+    },
+    {
+      "category": "cpu",
+      "message": "was not applied during --on",
+      "name": "swappiness",
+      "requires_root": false,
+      "result": "not-applied"
+    },
+    {
+      "category": "cpu",
+      "message": "restored soft=10240, hard=1048576",
+      "name": "ulimit_nofile",
+      "requires_root": false,
+      "result": "restored"
+    }
+  ],
+  "effective_active": false,
+  "failures": [],
+  "mode": "off",
+  "planned_count": 0,
+  "platform": "linux",
+  "previous_state": {
+    "rlimit_nofile": {
+      "hard": 1048576,
+      "soft": 10240
+    }
+  },
+  "skipped_count": 3,
+  "state_path": "/home/rishi/continuum-hydra/.hydra/state/accelerate_state.json",
+  "timestamp": "2026-02-17T16:41:59.010652+00:00"
+}

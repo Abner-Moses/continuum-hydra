@@ -3,13 +3,19 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import typer
 
 from continuum.accelerate.system_formatter import render_status
-from continuum.accelerate.system_state import load_state, save_state, utc_now
+from continuum.accelerate.system_state import load_state, save_state, state_path, utc_now
 from continuum.accelerate.system_tuner import apply_acceleration, capture_previous_state, detect_context, restore_acceleration
+
+AccelerateAction = Literal["on", "off", "status"]
+
+
+class UsageError(Exception):
+    pass
 
 
 def _compute_counts(changes: list[dict[str, Any]]) -> dict[str, int]:
@@ -28,8 +34,6 @@ def _active_status(*, active_requested: bool, effective_active: bool, applied_co
         return "False"
     if effective_active and applied_count > 0 and skipped_count == 0:
         return "True"
-    # Requested acceleration but either nothing applied or partial skip occurred.
-    # This is a degraded/partial mode by design.
     return "Partial"
 
 
@@ -64,6 +68,7 @@ def _build_payload(
         "failures": failures,
         "applied_actions": sorted(applied_actions),
         "previous_state": previous_state,
+        "state_path": str(state_path(Path.cwd())),
         **counts,
     }
     if message is not None:
@@ -74,6 +79,103 @@ def _build_payload(
 def _allow_risky() -> bool:
     value = os.environ.get("CONTINUUM_ACCELERATE_RISKY", "").strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+def execute_acceleration_action(
+    *,
+    action: AccelerateAction,
+    dry_run: bool,
+    cpu_only: bool,
+    gpu_only: bool,
+) -> dict[str, Any]:
+    ctx = detect_context()
+
+    if action == "status":
+        current = load_state(Path.cwd())
+        if current is None:
+            return _build_payload(
+                platform_name=ctx["platform"],
+                timestamp=utc_now(),
+                mode="status",
+                active_requested=False,
+                effective_active=False,
+                changes=[],
+                failures=[],
+                previous_state={},
+                applied_actions=[],
+            )
+        return current
+
+    if action == "on":
+        previous_state_full = capture_previous_state(ctx, cpu_only=cpu_only, gpu_only=gpu_only)
+        changes, failures, applied_actions, previous_state_applied = apply_acceleration(
+            ctx,
+            previous_state=previous_state_full,
+            dry_run=dry_run,
+            cpu_only=cpu_only,
+            gpu_only=gpu_only,
+            allow_risky=_allow_risky(),
+        )
+
+        effective_active = (not dry_run) and len(applied_actions) > 0
+        payload = _build_payload(
+            platform_name=ctx["platform"],
+            timestamp=utc_now(),
+            mode="dry-run" if dry_run else "on",
+            active_requested=True,
+            effective_active=effective_active,
+            changes=changes,
+            failures=failures,
+            previous_state=previous_state_applied,
+            applied_actions=applied_actions,
+        )
+
+        if not dry_run:
+            save_state(payload, Path.cwd())
+        return payload
+
+    existing = load_state(Path.cwd())
+    if existing is None:
+        payload = _build_payload(
+            platform_name=ctx["platform"],
+            timestamp=utc_now(),
+            mode="off",
+            active_requested=False,
+            effective_active=False,
+            changes=[],
+            failures=[],
+            previous_state={},
+            applied_actions=[],
+            message="No active acceleration state found.",
+        )
+        if not dry_run:
+            save_state(payload, Path.cwd())
+        return payload
+
+    previous_state = existing.get("previous_state", {})
+    applied_actions = list(existing.get("applied_actions", []))
+    changes, failures = restore_acceleration(
+        ctx,
+        previous_state=previous_state,
+        applied_actions=applied_actions,
+        dry_run=dry_run,
+    )
+
+    payload = _build_payload(
+        platform_name=ctx["platform"],
+        timestamp=utc_now(),
+        mode="dry-run" if dry_run else "off",
+        active_requested=False,
+        effective_active=False,
+        changes=changes,
+        failures=failures,
+        previous_state=previous_state,
+        applied_actions=[],
+    )
+
+    if not dry_run:
+        save_state(payload, Path.cwd())
+    return payload
 
 
 def accelerate_command(
@@ -87,115 +189,32 @@ def accelerate_command(
 ) -> None:
     try:
         if cpu_only and gpu_only:
-            typer.echo("Usage error: cannot combine --cpu-only and --gpu-only", err=True)
-            raise typer.Exit(code=2)
+            raise UsageError("cannot combine --cpu-only and --gpu-only")
 
         selected = sum(1 for flag in (on, off, status) if flag)
         if selected > 1:
-            typer.echo("Usage error: use only one of --on, --off, --status", err=True)
-            raise typer.Exit(code=2)
+            raise UsageError("use only one of --on, --off, --status")
 
-        if selected == 0:
-            status = True
-
-        ctx = detect_context()
-
-        if status:
-            current = load_state(Path.cwd())
-            if current is None:
-                payload = _build_payload(
-                    platform_name=ctx["platform"],
-                    timestamp=utc_now(),
-                    mode="status",
-                    active_requested=False,
-                    effective_active=False,
-                    changes=[],
-                    failures=[],
-                    previous_state={},
-                    applied_actions=[],
-                )
-                render_status(payload, verbose=verbose)
-            else:
-                render_status(current, verbose=verbose)
-            raise typer.Exit(code=0)
-
+        action: AccelerateAction = "status"
         if on:
-            previous_state_full = capture_previous_state(ctx, cpu_only=cpu_only, gpu_only=gpu_only)
-            changes, failures, applied_actions, previous_state_applied = apply_acceleration(
-                ctx,
-                previous_state=previous_state_full,
-                dry_run=dry_run,
-                cpu_only=cpu_only,
-                gpu_only=gpu_only,
-                allow_risky=_allow_risky(),
-            )
+            action = "on"
+        elif off:
+            action = "off"
 
-            effective_active = (not dry_run) and len(applied_actions) > 0
-            payload = _build_payload(
-                platform_name=ctx["platform"],
-                timestamp=utc_now(),
-                mode="dry-run" if dry_run else "on",
-                active_requested=True,
-                effective_active=effective_active,
-                changes=changes,
-                failures=failures,
-                previous_state=previous_state_applied,
-                applied_actions=applied_actions,
-            )
-
-            if not dry_run:
-                save_state(payload, Path.cwd())
-
-            if verbose:
-                typer.echo(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False), err=True)
-            render_status(payload, verbose=verbose)
-            raise typer.Exit(code=0)
-
-        existing = load_state(Path.cwd())
-        if existing is None:
-            payload = _build_payload(
-                platform_name=ctx["platform"],
-                timestamp=utc_now(),
-                mode="off",
-                active_requested=False,
-                effective_active=False,
-                changes=[],
-                failures=[],
-                previous_state={},
-                applied_actions=[],
-                message="No active acceleration state found.",
-            )
-            render_status(payload, verbose=verbose)
-            raise typer.Exit(code=0)
-
-        previous_state = existing.get("previous_state", {})
-        applied_actions = list(existing.get("applied_actions", []))
-        changes, failures = restore_acceleration(
-            ctx,
-            previous_state=previous_state,
-            applied_actions=applied_actions,
+        payload = execute_acceleration_action(
+            action=action,
             dry_run=dry_run,
+            cpu_only=cpu_only,
+            gpu_only=gpu_only,
         )
-
-        payload = _build_payload(
-            platform_name=ctx["platform"],
-            timestamp=utc_now(),
-            mode="dry-run" if dry_run else "off",
-            active_requested=False,
-            effective_active=False,
-            changes=changes,
-            failures=failures,
-            previous_state=previous_state,
-            applied_actions=[],
-        )
-
-        if not dry_run:
-            save_state(payload, Path.cwd())
 
         if verbose:
             typer.echo(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False), err=True)
         render_status(payload, verbose=verbose)
         raise typer.Exit(code=0)
+    except UsageError as exc:
+        typer.echo(f"Usage error: {exc}", err=True)
+        raise typer.Exit(code=2)
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -203,4 +222,4 @@ def accelerate_command(
         raise typer.Exit(code=4)
 
 
-__all__ = ["accelerate_command"]
+__all__ = ["accelerate_command", "execute_acceleration_action", "UsageError"]

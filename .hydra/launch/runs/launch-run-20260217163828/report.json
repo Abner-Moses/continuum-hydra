@@ -1,0 +1,62 @@
+{
+  "accelerate_state_path": "/home/rishi/continuum-hydra/.hydra/state/accelerate_state.json",
+  "accelerate_status": "Partial",
+  "accelerate_used": true,
+  "attempts": [
+    {
+      "checkpoint_seen": null,
+      "command_argv": [
+        "/home/rishi/continuum-hydra/.venv/bin/python3",
+        "-u",
+        "test_training/train_100m_mmfine_reason.py",
+        "--max-samples",
+        "500",
+        "--num-train-"
+      ],
+      "duration_seconds": 13.969,
+      "ended_at": "2026-02-17T16:38:42.955940+00:00",
+      "return_code": 2,
+      "started_at": "2026-02-17T16:38:28.989540+00:00",
+      "stdout_tail": [
+        "/home/rishi/continuum-hydra/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:65: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.",
+        "  import pynvml  # type: ignore[import]",
+        "usage: train_100m_mmfine_reason.py [-h] [--model MODEL] [--dataset DATASET]",
+        "                                   [--output-dir OUTPUT_DIR]",
+        "                                   [--max-samples MAX_SAMPLES]",
+        "                                   [--block-size BLOCK_SIZE]",
+        "                                   [--num-train-epochs NUM_TRAIN_EPOCHS]",
+        "                                   [--per-device-train-batch-size PER_DEVICE_TRAIN_BATCH_SIZE]",
+        "                                   [--gradient-accumulation-steps GRADIENT_ACCUMULATION_STEPS]",
+        "                                   [--learning-rate LEARNING_RATE]",
+        "                                   [--logging-steps LOGGING_STEPS]",
+        "                                   [--save-steps SAVE_STEPS] [--resume RESUME]",
+        "                                   [--fp16]",
+        "train_100m_mmfine_reason.py: error: argument --num-train-epochs: expected one argument"
+      ]
+    }
+  ],
+  "command_argv": [
+    "/home/rishi/continuum-hydra/.venv/bin/python3",
+    "-u",
+    "test_training/train_100m_mmfine_reason.py",
+    "--max-samples",
+    "500",
+    "--num-train-"
+  ],
+  "error": "training process exited with code 2; resume unavailable (no checkpoint discovered)",
+  "exit_code": 1,
+  "latest_checkpoint": null,
+  "log_path": "/home/rishi/continuum-hydra/.hydra/launch/runs/launch-run-20260217163828/launch.log",
+  "max_restarts": 1,
+  "mode": "apply",
+  "restarts_used": 0,
+  "run_id": "launch-run-20260217163828",
+  "schema_version": "launch.runtime.v1",
+  "script": "test_training/train_100m_mmfine_reason.py",
+  "script_args": [
+    "--max-samples",
+    "500",
+    "--num-train-"
+  ],
+  "status": "failed"
+}

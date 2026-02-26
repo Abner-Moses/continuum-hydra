@@ -1,0 +1,29 @@
+{
+  "active": false,
+  "changes_applied": [
+    {
+      "message": "root required for restore",
+      "name": "swappiness",
+      "result": "skipped"
+    },
+    {
+      "message": "restored soft=10240, hard=1048576",
+      "name": "ulimit_nofile",
+      "result": "restored"
+    }
+  ],
+  "failures": [],
+  "mode": "off",
+  "platform": "linux",
+  "previous_state": {
+    "cpu_governor": null,
+    "nice": 0,
+    "nvidia_persistence_mode": null,
+    "rlimit_nofile": {
+      "hard": 1048576,
+      "soft": 10240
+    },
+    "swappiness": 60
+  },
+  "timestamp": "2026-02-17T16:04:20.857796+00:00"
+}
