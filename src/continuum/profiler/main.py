@@ -164,6 +164,10 @@ def profile_command(
 __all__ = ["profile_command"]
 
 
+def main() -> None:
+    typer.run(profile_command)
+
+
 def _parse_selected_benchmarks(raw: str | None) -> set[str]:
     if raw is None or not raw.strip():
         return set(_BENCHMARK_ORDER)

@@ -9,6 +9,10 @@ It ships five production CLI flows:
 - `continuum launch`: training script runtime with checkpoint-aware auto-restart / auto-resume
 - `continuum setup`: environment bootstrap for NumPy/PyTorch with reproducibility state artifacts
 
+## CLI Demo
+
+![Continuum Hydra CLI demo](continuum-hydra-default.gif)
+
 ## Design Principles
 
 - Structured diagnostics with explicit `PASS`/`WARN`/`FAIL`/`SKIP` states
@@ -41,6 +45,13 @@ Optional profiling extras:
 ```bash
 python -m pip install -e .[profile]
 ```
+
+## macOS Notes
+
+- `continuum doctor` on macOS will usually report `WARN` for `pytorch.cuda_available` unless you have a working GPU backend available to PyTorch.
+- NVIDIA-specific checks may be skipped on macOS systems without `nvidia-smi` / NVML access.
+- `continuum profile` can still run CPU, memory, and disk benchmarks on macOS even when GPU benchmarking is unavailable.
+- Some `continuum accelerate` actions are Linux-specific, so macOS commonly shows them as unsupported in dry-run plans.
 
 ## CLI Overview
 

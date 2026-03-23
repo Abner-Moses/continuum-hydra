@@ -210,3 +210,13 @@ __marimo__/
 
 # Local AI session handoff/context notes
 context.md
+
+# Continuum local runtime state and generated reports
+.continuum/state/
+.hydra/reports/
+.hydra/state/
+.hydra/launch/runs/
+
+# Local recording/session artifacts
+continuum-hydra-*.yml
+my-session.yml
